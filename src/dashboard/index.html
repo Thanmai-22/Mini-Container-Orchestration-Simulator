@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>K8s Orchestration Simulator</title>
+<style>
+  :root {
+    --bg-primary: #0a0e17;
+    --bg-secondary: #111827;
+    --bg-card: #1a2332;
+    --bg-card-hover: #1f2b3d;
+    --border: #2a3a50;
+    --text-primary: #e2e8f0;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
+    --accent-blue: #3b82f6;
+    --accent-cyan: #06b6d4;
+    --accent-green: #10b981;
+    --accent-yellow: #f59e0b;
+    --accent-red: #ef4444;
+    --accent-purple: #8b5cf6;
+    --gradient-blue: linear-gradient(135deg, #3b82f6, #06b6d4);
+    --gradient-green: linear-gradient(135deg, #10b981, #06b6d4);
+    --gradient-red: linear-gradient(135deg, #ef4444, #f59e0b);
+    --radius: 12px;
+    --shadow: 0 4px 24px rgba(0,0,0,0.3);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  /* ── Header ─────────────────────────────── */
+  .header {
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border);
+    padding: 16px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    backdrop-filter: blur(12px);
+  }
+  .header-left { display: flex; align-items: center; gap: 16px; }
+  .logo {
+    width: 40px; height: 40px;
+    background: var(--gradient-blue);
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px; font-weight: 800; color: white;
+  }
+  .header h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.5px; }
+  .header h1 span { color: var(--accent-cyan); }
+  .connection-badge {
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .connection-badge.connected { background: rgba(16,185,129,0.15); color: var(--accent-green); }
+  .connection-badge.disconnected { background: rgba(239,68,68,0.15); color: var(--accent-red); }
+  .connection-badge::before {
+    content: '';
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: currentColor;
+  }
+
+  /* ── Controls Bar ───────────────────────── */
+  .controls {
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 32px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .btn {
+    padding: 8px 18px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--bg-card);
+    color: var(--text-primary);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .btn:hover { background: var(--bg-card-hover); border-color: var(--accent-blue); }
+  .btn-primary { background: var(--accent-blue); border-color: var(--accent-blue); color: white; }
+  .btn-primary:hover { background: #2563eb; }
+  .btn-success { background: var(--accent-green); border-color: var(--accent-green); color: white; }
+  .btn-success:hover { background: #059669; }
+  .btn-danger { background: var(--accent-red); border-color: var(--accent-red); color: white; }
+  .btn-danger:hover { background: #dc2626; }
+  .btn-warning { background: var(--accent-yellow); border-color: var(--accent-yellow); color: #1a1a1a; }
+
+  select {
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--bg-card);
+    color: var(--text-primary);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+  .controls-sep {
+    width: 1px; height: 28px;
+    background: var(--border);
+    margin: 0 4px;
+  }
+  .tick-display {
+    margin-left: auto;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--accent-cyan);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ── Main Layout ────────────────────────── */
+  .main { padding: 24px 32px; }
+
+  /* ── Stats Cards ────────────────────────── */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .stat-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    position: relative;
+    overflow: hidden;
+  }
+  .stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+  }
+  .stat-card:nth-child(1)::before { background: var(--gradient-blue); }
+  .stat-card:nth-child(2)::before { background: var(--gradient-green); }
+  .stat-card:nth-child(3)::before { background: var(--accent-yellow); }
+  .stat-card:nth-child(4)::before { background: var(--accent-purple); }
+  .stat-card:nth-child(5)::before { background: var(--gradient-red); }
+  .stat-card:nth-child(6)::before { background: var(--accent-cyan); }
+  .stat-label {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+  }
+  .stat-value {
+    font-size: 32px;
+    font-weight: 800;
+    letter-spacing: -1px;
+    font-variant-numeric: tabular-nums;
+  }
+  .stat-sub {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-top: 4px;
+  }
+
+  /* ── Section Layout ─────────────────────── */
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    margin-bottom: 24px;
+  }
+  @media (max-width: 1024px) {
+    .grid-2 { grid-template-columns: 1fr; }
+  }
+
+  .panel {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .panel-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .panel-title {
+    font-size: 15px;
+    font-weight: 700;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .panel-body { padding: 16px 20px; max-height: 420px; overflow-y: auto; }
+
+  /* ── Node Cards ─────────────────────────── */
+  .node-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 12px;
+    transition: all 0.2s;
+  }
+  .node-card:hover { border-color: var(--accent-blue); }
+  .node-card.failed { border-color: var(--accent-red); background: rgba(239,68,68,0.05); }
+  .node-card.cordoned { border-color: var(--accent-yellow); background: rgba(245,158,11,0.05); }
+  .node-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .node-name { font-size: 14px; font-weight: 700; }
+  .status-badge {
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .status-Ready { background: rgba(16,185,129,0.15); color: var(--accent-green); }
+  .status-NotReady { background: rgba(245,158,11,0.15); color: var(--accent-yellow); }
+  .status-Failed { background: rgba(239,68,68,0.15); color: var(--accent-red); }
+  .status-Cordoned { background: rgba(245,158,11,0.15); color: var(--accent-yellow); }
+  .status-Running { background: rgba(16,185,129,0.15); color: var(--accent-green); }
+  .status-Pending { background: rgba(245,158,11,0.15); color: var(--accent-yellow); }
+  .status-Succeeded { background: rgba(59,130,246,0.15); color: var(--accent-blue); }
+  .status-Evicted { background: rgba(139,92,246,0.15); color: var(--accent-purple); }
+
+  .resource-bars { margin-top: 8px; }
+  .resource-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 6px;
+    font-size: 12px;
+  }
+  .resource-label { width: 40px; color: var(--text-muted); font-weight: 600; }
+  .resource-bar {
+    flex: 1;
+    height: 8px;
+    background: rgba(255,255,255,0.05);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .resource-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.5s ease;
+  }
+  .resource-bar-fill.cpu { background: var(--accent-blue); }
+  .resource-bar-fill.mem { background: var(--accent-purple); }
+  .resource-bar-fill.high { background: var(--accent-yellow); }
+  .resource-bar-fill.critical { background: var(--accent-red); }
+  .resource-pct { width: 42px; text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .node-pods-count { font-size: 12px; color: var(--text-muted); }
+  .node-actions { display: flex; gap: 6px; margin-top: 10px; }
+  .node-actions .btn { padding: 4px 10px; font-size: 11px; }
+
+  /* ── Pod Table ──────────────────────────── */
+  .pod-table { width: 100%; border-collapse: collapse; }
+  .pod-table th {
+    text-align: left;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .pod-table td {
+    padding: 10px 12px;
+    font-size: 13px;
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+  }
+  .pod-table tr:hover td { background: rgba(255,255,255,0.02); }
+  .pod-name { font-weight: 600; color: var(--accent-cyan); }
+  .pod-delete {
+    background: transparent;
+    border: 1px solid rgba(239,68,68,0.3);
+    color: var(--accent-red);
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-size: 11px;
+    cursor: pointer;
+    font-weight: 600;
+  }
+  .pod-delete:hover { background: rgba(239,68,68,0.15); }
+
+  /* ── Event Log ──────────────────────────── */
+  .event-row {
+    display: flex;
+    gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+    font-size: 12px;
+    align-items: flex-start;
+  }
+  .event-time {
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    min-width: 72px;
+  }
+  .event-severity {
+    padding: 1px 8px;
+    border-radius: 4px;
+    font-weight: 700;
+    font-size: 10px;
+    text-transform: uppercase;
+    min-width: 64px;
+    text-align: center;
+  }
+  .sev-INFO { background: rgba(59,130,246,0.15); color: var(--accent-blue); }
+  .sev-WARNING { background: rgba(245,158,11,0.15); color: var(--accent-yellow); }
+  .sev-ERROR { background: rgba(239,68,68,0.15); color: var(--accent-red); }
+  .sev-CRITICAL { background: rgba(239,68,68,0.3); color: #fca5a5; }
+  .event-source { color: var(--accent-purple); font-weight: 600; min-width: 100px; }
+  .event-msg { color: var(--text-secondary); flex: 1; }
+
+  /* ── Metrics Chart (CSS-only sparkline) ── */
+  .metrics-chart {
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+    height: 80px;
+    padding: 8px 0;
+  }
+  .metrics-bar {
+    flex: 1;
+    background: var(--accent-blue);
+    border-radius: 2px 2px 0 0;
+    min-width: 4px;
+    transition: height 0.3s ease;
+    opacity: 0.7;
+  }
+  .metrics-bar:hover { opacity: 1; }
+  .metrics-bar.mem { background: var(--accent-purple); }
+
+  .chart-legend {
+    display: flex;
+    gap: 16px;
+    margin-top: 8px;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+  .chart-legend span {
+    display: flex; align-items: center; gap: 6px;
+  }
+  .legend-dot {
+    width: 10px; height: 10px;
+    border-radius: 3px;
+  }
+  .legend-dot.cpu { background: var(--accent-blue); }
+  .legend-dot.mem { background: var(--accent-purple); }
+
+  /* ── Scrollbar ──────────────────────────── */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+  .empty-state {
+    text-align: center;
+    padding: 32px;
+    color: var(--text-muted);
+    font-size: 14px;
+  }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <div class="header-left">
+    <div class="logo">K</div>
+    <h1>Mini <span>K8s</span> Orchestrator</h1>
+  </div>
+  <div id="connectionBadge" class="connection-badge disconnected">Disconnected</div>
+</div>
+
+<!-- Controls -->
+<div class="controls">
+  <button class="btn btn-success" onclick="startSim()">&#9654; Start</button>
+  <button class="btn btn-danger" onclick="stopSim()">&#9632; Stop</button>
+  <button class="btn" onclick="manualTick()">&#8635; Tick</button>
+  <div class="controls-sep"></div>
+  <button class="btn btn-primary" onclick="createPod()">+ Pod</button>
+  <button class="btn btn-primary" onclick="batchDeploy()">+ Batch (5)</button>
+  <button class="btn" onclick="addNode()">+ Node</button>
+  <div class="controls-sep"></div>
+  <label style="font-size:12px;color:var(--text-muted);font-weight:600;">Strategy:</label>
+  <select id="strategySelect" onchange="changeStrategy(this.value)">
+    <option value="best-fit">Best Fit</option>
+    <option value="first-fit">First Fit</option>
+    <option value="round-robin">Round Robin</option>
+    <option value="least-loaded">Least Loaded</option>
+  </select>
+  <div class="controls-sep"></div>
+  <button class="btn btn-warning" onclick="resetCluster()">&#8634; Reset</button>
+  <div class="tick-display">Tick: <span id="tickNum">0</span></div>
+</div>
+
+<!-- Main Content -->
+<div class="main">
+
+  <!-- Stats Row -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-label">Total Nodes</div>
+      <div class="stat-value" id="statNodes">0</div>
+      <div class="stat-sub" id="statNodesHealth">0 healthy</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Running Pods</div>
+      <div class="stat-value" id="statPods">0</div>
+      <div class="stat-sub" id="statPodsPending">0 pending</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">CPU Utilization</div>
+      <div class="stat-value" id="statCPU">0%</div>
+      <div class="stat-sub">cluster-wide</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Memory Utilization</div>
+      <div class="stat-value" id="statMem">0%</div>
+      <div class="stat-sub">cluster-wide</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Total Restarts</div>
+      <div class="stat-value" id="statRestarts">0</div>
+      <div class="stat-sub">container restarts</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Events</div>
+      <div class="stat-value" id="statEvents">0</div>
+      <div class="stat-sub" id="statEventBreakdown">-</div>
+    </div>
+  </div>
+
+  <!-- Nodes + Pods -->
+  <div class="grid-2">
+    <!-- Nodes Panel -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">&#9881; Cluster Nodes</div>
+      </div>
+      <div class="panel-body" id="nodesPanel">
+        <div class="empty-state">Initialize the cluster to see nodes</div>
+      </div>
+    </div>
+    <!-- Pods Panel -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">&#9638; Pods</div>
+        <span style="font-size:12px;color:var(--text-muted)" id="podCount">0 pods</span>
+      </div>
+      <div class="panel-body" id="podsPanel" style="padding:0;">
+        <div class="empty-state">No pods deployed yet</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Metrics + Events -->
+  <div class="grid-2">
+    <!-- Metrics -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">&#9636; Resource Metrics</div>
+      </div>
+      <div class="panel-body">
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:4px;">CPU Utilization Over Time</div>
+        <div class="metrics-chart" id="cpuChart"></div>
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:4px;margin-top:16px;">Memory Utilization Over Time</div>
+        <div class="metrics-chart" id="memChart"></div>
+        <div class="chart-legend">
+          <span><div class="legend-dot cpu"></div> CPU %</span>
+          <span><div class="legend-dot mem"></div> Memory %</span>
+        </div>
+      </div>
+    </div>
+    <!-- Events -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">&#9993; Event Log</div>
+      </div>
+      <div class="panel-body" id="eventsPanel" style="max-height:340px;">
+        <div class="empty-state">No events yet</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = window.location.origin;
+let ws = null;
+let state = {};
+
+function connect() {
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  ws = new WebSocket(`${proto}://${location.host}/ws`);
+  ws.onopen = () => {
+    document.getElementById('connectionBadge').className = 'connection-badge connected';
+    document.getElementById('connectionBadge').textContent = 'Connected';
+  };
+  ws.onclose = () => {
+    document.getElementById('connectionBadge').className = 'connection-badge disconnected';
+    document.getElementById('connectionBadge').textContent = 'Disconnected';
+    setTimeout(connect, 2000);
+  };
+  ws.onmessage = (e) => {
+    const msg = JSON.parse(e.data);
+    if (msg.state) {
+      state = msg.state;
+      render(state);
+    }
+  };
+}
+
+async function api(method, path, body) {
+  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  if (body) opts.body = JSON.stringify(body);
+  const res = await fetch(API + path, opts);
+  const data = await res.json();
+  if (data.state) { state = data.state; render(state); }
+  return data;
+}
+
+async function startSim() { await api('POST', '/api/simulation/start?tick_interval=1.0'); }
+async function stopSim() { await api('POST', '/api/simulation/stop'); }
+async function manualTick() { await api('POST', '/api/cluster/tick'); }
+async function createPod() { await api('POST', '/api/pods/create', {}); }
+async function batchDeploy() { await api('POST', '/api/pods/batch', { count: 5 }); }
+async function addNode() { await api('POST', '/api/nodes/add', {}); }
+async function deletePod(id) { await api('DELETE', `/api/pods/${id}`); }
+async function removeNode(id) { await api('DELETE', `/api/nodes/${id}`); }
+async function cordonNode(id) { await api('POST', `/api/nodes/${id}/cordon`); }
+async function uncordonNode(id) { await api('POST', `/api/nodes/${id}/uncordon`); }
+async function changeStrategy(s) { await api('POST', '/api/scheduler/strategy', { strategy: s }); }
+async function resetCluster() {
+  await api('POST', '/api/cluster/init', {
+    num_nodes: 3,
+    scheduler_strategy: document.getElementById('strategySelect').value,
+    node_failure_rate: 0.02,
+    container_failure_rate: 0.05,
+  });
+}
+
+function barClass(pct) {
+  if (pct > 85) return 'critical';
+  if (pct > 65) return 'high';
+  return '';
+}
+
+function formatTime(ts) {
+  const d = new Date(ts * 1000);
+  return d.toLocaleTimeString();
+}
+
+function render(s) {
+  if (!s) return;
+  const m = s.metrics || {};
+  const mh = s.metrics_history || [];
+  const nodes = s.nodes || [];
+  const pods = s.pods || [];
+  const events = s.events || [];
+  const ec = s.event_counts || {};
+
+  document.getElementById('tickNum').textContent = s.tick || 0;
+  document.getElementById('statNodes').textContent = nodes.length;
+  document.getElementById('statNodesHealth').textContent =
+    `${nodes.filter(n => n.status === 'Ready').length} healthy`;
+  document.getElementById('statPods').textContent =
+    pods.filter(p => p.status === 'Running').length;
+  document.getElementById('statPodsPending').textContent =
+    `${pods.filter(p => p.status === 'Pending').length} pending`;
+  document.getElementById('statCPU').textContent =
+    (m.cluster_cpu_utilization || 0).toFixed(1) + '%';
+  document.getElementById('statMem').textContent =
+    (m.cluster_memory_utilization || 0).toFixed(1) + '%';
+  document.getElementById('statRestarts').textContent = m.total_restarts || 0;
+
+  const totalEvts = Object.values(ec).reduce((a, b) => a + b, 0);
+  document.getElementById('statEvents').textContent = totalEvts;
+  document.getElementById('statEventBreakdown').textContent =
+    `${ec.WARNING || 0} warn / ${ec.ERROR || 0} err / ${ec.CRITICAL || 0} crit`;
+
+  renderNodes(nodes);
+  renderPods(pods);
+  renderMetrics(mh);
+  renderEvents(events);
+}
+
+function renderNodes(nodes) {
+  const el = document.getElementById('nodesPanel');
+  if (!nodes.length) {
+    el.innerHTML = '<div class="empty-state">No nodes in cluster</div>';
+    return;
+  }
+  el.innerHTML = nodes.map(n => {
+    const r = n.resources;
+    const cpuPct = r.cpu_utilization;
+    const memPct = r.memory_utilization;
+    const cls = n.status === 'Failed' ? 'failed' : n.status === 'Cordoned' ? 'cordoned' : '';
+    return `
+      <div class="node-card ${cls}">
+        <div class="node-header">
+          <span class="node-name">${n.name}</span>
+          <span class="status-badge status-${n.status}">${n.status}</span>
+        </div>
+        <div class="resource-bars">
+          <div class="resource-row">
+            <span class="resource-label">CPU</span>
+            <div class="resource-bar">
+              <div class="resource-bar-fill cpu ${barClass(cpuPct)}" style="width:${cpuPct}%"></div>
+            </div>
+            <span class="resource-pct">${cpuPct.toFixed(0)}%</span>
+          </div>
+          <div class="resource-row">
+            <span class="resource-label">MEM</span>
+            <div class="resource-bar">
+              <div class="resource-bar-fill mem ${barClass(memPct)}" style="width:${memPct}%"></div>
+            </div>
+            <span class="resource-pct">${memPct.toFixed(0)}%</span>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;">
+          <span class="node-pods-count">${n.pod_count} pod(s) · ${r.available_cpu}m / ${r.total_cpu}m CPU · ${r.available_memory}MB / ${r.total_memory}MB RAM</span>
+        </div>
+        <div class="node-actions">
+          ${n.status === 'Ready' ? `<button class="btn" onclick="cordonNode('${n.id}')">Cordon</button>` : ''}
+          ${n.status === 'Cordoned' ? `<button class="btn" onclick="uncordonNode('${n.id}')">Uncordon</button>` : ''}
+          <button class="btn btn-danger" onclick="removeNode('${n.id}')" style="margin-left:auto;">Remove</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function renderPods(pods) {
+  const el = document.getElementById('podsPanel');
+  document.getElementById('podCount').textContent = `${pods.length} pods`;
+  if (!pods.length) {
+    el.innerHTML = '<div class="empty-state" style="padding:32px;">No pods deployed</div>';
+    return;
+  }
+  const sorted = [...pods].sort((a, b) => {
+    const order = { Running: 0, Pending: 1, Scheduled: 2, Succeeded: 3, Evicted: 4, Failed: 5 };
+    return (order[a.status] || 9) - (order[b.status] || 9);
+  });
+  el.innerHTML = `<table class="pod-table">
+    <thead><tr>
+      <th>Name</th><th>Status</th><th>Node</th><th>CPU</th><th>MEM</th><th>Restarts</th><th></th>
+    </tr></thead>
+    <tbody>${sorted.map(p => `<tr>
+      <td class="pod-name">${p.name}</td>
+      <td><span class="status-badge status-${p.status}">${p.status}</span></td>
+      <td style="font-size:12px;color:var(--text-muted)">${p.node_id || '-'}</td>
+      <td style="font-size:12px">${p.resource_request.cpu_millicores}m</td>
+      <td style="font-size:12px">${p.resource_request.memory_mb}MB</td>
+      <td style="font-size:12px;font-variant-numeric:tabular-nums">${p.restart_count}</td>
+      <td><button class="pod-delete" onclick="deletePod('${p.id}')">Delete</button></td>
+    </tr>`).join('')}</tbody></table>`;
+}
+
+function renderMetrics(history) {
+  const cpuEl = document.getElementById('cpuChart');
+  const memEl = document.getElementById('memChart');
+  const last = history.slice(-60);
+  if (!last.length) {
+    cpuEl.innerHTML = '<div class="empty-state" style="height:80px;display:flex;align-items:center;justify-content:center;">No data yet</div>';
+    memEl.innerHTML = '<div class="empty-state" style="height:80px;display:flex;align-items:center;justify-content:center;">No data yet</div>';
+    return;
+  }
+  cpuEl.innerHTML = last.map(m =>
+    `<div class="metrics-bar" style="height:${Math.max(2, m.cluster_cpu_utilization)}%" title="CPU: ${m.cluster_cpu_utilization.toFixed(1)}%"></div>`
+  ).join('');
+  memEl.innerHTML = last.map(m =>
+    `<div class="metrics-bar mem" style="height:${Math.max(2, m.cluster_memory_utilization)}%" title="Mem: ${m.cluster_memory_utilization.toFixed(1)}%"></div>`
+  ).join('');
+}
+
+function renderEvents(events) {
+  const el = document.getElementById('eventsPanel');
+  if (!events.length) {
+    el.innerHTML = '<div class="empty-state">No events yet</div>';
+    return;
+  }
+  const reversed = [...events].reverse().slice(0, 80);
+  el.innerHTML = reversed.map(e => `
+    <div class="event-row">
+      <span class="event-time">${formatTime(e.timestamp)}</span>
+      <span class="event-severity sev-${e.severity}">${e.severity}</span>
+      <span class="event-source">${e.source}</span>
+      <span class="event-msg">${e.message}</span>
+    </div>`).join('');
+}
+
+connect();
+</script>
+</body>
+</html>
