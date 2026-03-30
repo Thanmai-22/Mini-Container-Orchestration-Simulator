@@ -6,6 +6,14 @@ Built to demonstrate deep understanding of how container orchestrators work unde
 
 ---
 
+## Dashboard
+
+![Dashboard Screenshot](screenshots/dashboard.png)
+
+*Real-time dashboard showing 3 cluster nodes, 11 running pods, CPU/memory utilization, container restarts, and a live event log — all updating via WebSocket.*
+
+---
+
 ## Architecture
 
 ```
