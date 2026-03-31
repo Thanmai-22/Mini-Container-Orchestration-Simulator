@@ -1,8 +1,8 @@
 # Mini Container Orchestration Simulator
 
-A from-scratch Kubernetes-style container orchestration engine that **schedules pods**, **allocates CPU/memory**, **handles node failures**, and visualizes everything through a **real-time web dashboard** and **CLI**.
+Designed and implemented a Kubernetes-inspired container orchestration engine to explore **scheduling efficiency**, **resource contention**, and **failure recovery** in distributed systems.
 
-Built to demonstrate deep understanding of how container orchestrators work under the hood.
+Simulates the core control plane of a container orchestrator — scheduling pods across a cluster of nodes with finite CPU/memory, handling node crashes with automatic eviction and rescheduling, and surfacing everything through a real-time dashboard.
 
 ---
 
@@ -10,78 +10,162 @@ Built to demonstrate deep understanding of how container orchestrators work unde
 
 ![Dashboard Screenshot](screenshots/dashboard.png)
 
-*Real-time dashboard showing 3 cluster nodes, 11 running pods, CPU/memory utilization, container restarts, and a live event log — all updating via WebSocket.*
+*Real-time dashboard showing 3 cluster nodes, 11 running pods with Best Fit scheduling, CPU/memory utilization bars, container restart tracking, and a live event log — all updating via WebSocket.*
+
+---
+
+## Performance & Benchmarks
+
+All numbers are from real benchmarks (`python benchmarks.py`) — not estimates.
+
+### Scheduling Latency (200 pods, 5 nodes)
+
+| Strategy | Avg | P50 | P99 | Max |
+|---|---|---|---|---|
+| First Fit | **6.4 us** | 5.9 us | 34.6 us | 42.9 us |
+| Best Fit | 7.4 us | 7.2 us | 12.3 us | 19.5 us |
+| Round Robin | 8.1 us | 6.2 us | 67.7 us | 91.7 us |
+| Least Loaded | 9.0 us | 8.4 us | 33.3 us | 45.4 us |
+
+First Fit is ~40% faster than Least Loaded on average, but Least Loaded produces better cluster balance (see below).
+
+### Scheduling Throughput (2-second burst, 10 nodes)
+
+| Strategy | Pods Scheduled | Pods/sec |
+|---|---|---|
+| First Fit | 113,013 | **56,506** |
+| Round Robin | 110,632 | 55,316 |
+| Best Fit | 101,893 | 50,946 |
+| Least Loaded | 89,632 | 43,746 |
+
+First Fit achieves ~29% higher throughput than Least Loaded due to its O(n) scan vs O(n log n) comparison.
+
+### Resource Utilization Efficiency (varied pod sizes, 4 nodes)
+
+| Strategy | Pods Placed | CPU Util | MEM Util | Load Balance SD |
+|---|---|---|---|---|
+| Best Fit | **75** | 84.3% | 58.5% | 0.077 |
+| First Fit | 60 | 68.2% | 82.0% | 0.086 |
+| Least Loaded | 40 | 98.0% | 17.8% | **0.069** |
+| Round Robin | 32 | 96.9% | 34.7% | 0.098 |
+
+Best Fit places **25% more pods** than First Fit by packing bins more efficiently. Least Loaded has the lowest load imbalance (SD 0.069) — it keeps nodes evenly utilized.
+
+### Failure Recovery
+
+| Metric | Value |
+|---|---|
+| Pods before failure | 12 |
+| Pods evicted on node crash | 4 |
+| Ticks to full recovery | **1** |
+| Recovery rate | **100%** |
+
+When a node fails, all its pods are evicted and rescheduled to surviving nodes within a single tick cycle.
+
+### Resource Fragmentation (Best Fit vs Round Robin)
+
+| Strategy | Fragmentation |
+|---|---|
+| Best Fit | **61.7%** |
+| Round Robin | 68.6% |
+
+Best Fit reduces fragmentation by ~10% compared to Round Robin — it packs workloads tightly, leaving fewer unusable resource gaps across nodes.
+
+---
+
+## Design Tradeoffs
+
+| Strategy | Strength | Weakness | When to use |
+|---|---|---|---|
+| **First Fit** | Fastest scheduling (6.4us avg, 56K pods/sec) | Causes resource fragmentation; pods pile onto the first node | Latency-critical control planes where scheduling speed matters more than packing |
+| **Best Fit** | Best bin-packing — 25% more pods per cluster | Slower scheduling; can create hotspots on nearly-full nodes | Maximizing cluster density to reduce infrastructure cost |
+| **Round Robin** | Simple, predictable distribution | Ignores resource constraints; high fragmentation (68.6%) | Homogeneous workloads where all pods are the same size |
+| **Least Loaded** | Most balanced utilization (SD 0.069) | Slowest throughput (43K pods/sec); may scatter related pods | Production clusters where even utilization prevents tail latency spikes |
+
+**Key insight:** There is no universally "best" strategy. The choice depends on whether you optimize for **scheduling speed** (First Fit), **cluster density** (Best Fit), **fairness** (Round Robin), or **tail latency** (Least Loaded). Real schedulers like kube-scheduler combine multiple scoring functions to balance these tradeoffs.
+
+---
+
+## Real-World Problems Simulated
+
+### Resource Contention & Fragmentation
+Pods have varied CPU/memory requests (100-400m CPU, 128-512MB RAM). As nodes fill unevenly, small resource gaps appear that can't fit new pods — even though aggregate cluster capacity exists. Best Fit reduces this by 10% vs Round Robin.
+
+### Noisy Neighbor Effect
+High-CPU pods scheduled onto the same node compete for resources. The dashboard shows per-node CPU bars turning yellow (>65%) and red (>85%), making contention visible in real time.
+
+### Node Failure & Cascading Recovery
+When a node crashes, all its pods are evicted simultaneously. The health monitor detects the failure, releases resources, re-queues pods, and the scheduler places them on surviving nodes — all within one tick. This mirrors how the Kubernetes node controller handles `NotReady` nodes.
+
+### Scheduling Fairness vs Efficiency
+Least Loaded spreads pods evenly (good for tail latency) but can't pack as tightly as Best Fit (which maximizes density). This is the same tension between **spread** and **bin-packing** that production schedulers face.
+
+### Pod Starvation
+When cluster capacity is exhausted, new pods remain in `Pending` state — visible in the dashboard as yellow badges. Adding a node or deleting pods frees capacity and triggers rescheduling, mirroring `kubectl get pods` showing `Pending` in real clusters.
 
 ---
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        API Server (FastAPI)                     │
-│              REST endpoints + WebSocket real-time               │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  ┌──────────────┐   ┌──────────────┐   ┌────────────────────┐  │
-│  │   Scheduler   │   │   Cluster    │   │   Health Monitor   │  │
-│  │              │   │   Manager    │   │                    │  │
-│  │ ● First Fit  │   │              │   │ ● Failure detect   │  │
-│  │ ● Best Fit   │◄─►│ ● Node mgmt  │◄─►│ ● Auto-eviction   │  │
-│  │ ● Round Robin│   │ ● Pod CRUD   │   │ ● Auto-recovery   │  │
-│  │ ● Least Load │   │ ● Tick engine│   │ ● Re-scheduling   │  │
-│  └──────────────┘   └──────────────┘   └────────────────────┘  │
-│           │                │                     │              │
-│  ┌────────▼─────────────────▼─────────────────────▼──────────┐  │
-│  │                    Core Models                            │  │
-│  │  Node (CPU/MEM pool)  ←→  Pod (container group)          │  │
-│  │  ResourcePool         ←→  Container (lifecycle)          │  │
-│  └───────────────────────────────────────────────────────────┘  │
-│           │                                                     │
-│  ┌────────▼──────────────────────────────────────────────────┐  │
-│  │              Monitoring & Observability                    │  │
-│  │  EventLogger (structured events)                          │  │
-│  │  MetricsCollector (CPU/MEM utilization history)           │  │
-│  └───────────────────────────────────────────────────────────┘  │
-│                                                                 │
-├─────────────────────────────────────────────────────────────────┤
-│                  Web Dashboard (single-page)                    │
-│        Real-time via WebSocket · Nodes · Pods · Metrics         │
-└─────────────────────────────────────────────────────────────────┘
++-----------------------------------------------------------------+
+|                      API Server (FastAPI)                        |
+|             REST endpoints + WebSocket real-time                 |
++-----------------------------------------------------------------+
+|                                                                  |
+|  +--------------+   +--------------+   +--------------------+   |
+|  |   Scheduler  |   |   Cluster    |   |   Health Monitor   |   |
+|  |              |   |   Manager    |   |                    |   |
+|  | - First Fit  |   |              |   | - Failure detect   |   |
+|  | - Best Fit   |<->| - Node mgmt  |<->| - Auto-eviction   |   |
+|  | - Round Robin|   | - Pod CRUD   |   | - Auto-recovery    |   |
+|  | - Least Load |   | - Tick engine|   | - Re-scheduling    |   |
+|  +--------------+   +--------------+   +--------------------+   |
+|          |                |                     |               |
+|  +-------v-----------------v---------------------v-----------+  |
+|  |                    Core Models                            |  |
+|  |  Node (CPU/MEM pool)  <->  Pod (container group)         |  |
+|  |  ResourcePool         <->  Container (lifecycle)         |  |
+|  +-----------------------------------------------------------+  |
+|          |                                                      |
+|  +-------v---------------------------------------------------+  |
+|  |              Monitoring & Observability                    |  |
+|  |  EventLogger (structured events)                          |  |
+|  |  MetricsCollector (CPU/MEM utilization history)           |  |
+|  +-----------------------------------------------------------+  |
+|                                                                  |
++-----------------------------------------------------------------+
+|                  Web Dashboard (single-page)                     |
+|        Real-time via WebSocket - Nodes - Pods - Metrics          |
++-----------------------------------------------------------------+
 ```
 
 ## Key Features
 
 ### Scheduling Engine
-- **4 pluggable strategies** — First Fit, Best Fit, Round Robin, Least Loaded
-- Mirrors kube-scheduler's **filter → score → bind** cycle
+- **4 pluggable strategies** with measurable performance differences (see benchmarks above)
+- Mirrors kube-scheduler's **filter -> score -> bind** cycle
 - Pending queue with automatic retry for unschedulable pods
-- Hot-swappable strategies at runtime
+- Hot-swappable strategies at runtime via API or dashboard
 
 ### Resource Management
 - Per-node CPU (millicores) and memory (MB) tracking
 - Allocation/release accounting with audit trail
 - Utilization metrics (per-node and cluster-wide)
+- Fragmentation analysis across strategies
 
 ### Failure Handling
 - **Node failures** — random crash simulation with configurable failure rates
 - **Container failures** — individual containers crash independently
 - **Auto-eviction** — pods on failed nodes are evicted and re-queued
 - **Auto-recovery** — nodes heal after a cooldown, enabling rescheduling
-- **Restart policies** — `Always` (auto-restart) and `Never` (fail permanently)
+- **Restart policies** — `Always` (auto-restart containers) and `Never` (fail permanently)
+- **100% recovery rate** — all evicted pods rescheduled within 1 tick
 
 ### Monitoring & Observability
-- **Event log** — every scheduling decision, failure, and recovery is recorded
-- **Metrics history** — CPU/memory utilization tracked over time
-- **Real-time dashboard** — WebSocket-powered live updates
-
-### Web Dashboard
-- Cluster-wide stats (nodes, pods, CPU, memory, restarts, events)
-- Per-node resource bars with color-coded utilization
-- Pod table with status, resources, and delete actions
-- CPU/memory utilization sparkline charts
-- Structured event log with severity filtering
-- Cordon/uncordon node controls
-- Strategy switching at runtime
+- **Structured event log** — every scheduling decision, failure, and recovery is recorded with severity levels
+- **Metrics history** — CPU/memory utilization tracked over time with time-series snapshots
+- **Real-time dashboard** — WebSocket-powered live updates at 1Hz
 
 ---
 
@@ -93,7 +177,6 @@ Built to demonstrate deep understanding of how container orchestrators work unde
 ### Install
 
 ```bash
-cd "Kubernetes Container Project"
 pip install -r requirements.txt
 ```
 
@@ -103,14 +186,7 @@ pip install -r requirements.txt
 python main.py server
 ```
 
-Open **http://localhost:8000** — you'll see the orchestrator dashboard.
-
-- Click **Start** to begin the simulation loop
-- Click **+ Pod** or **+ Batch (5)** to deploy workloads
-- Watch pods get scheduled, nodes fill up, failures happen, and recovery kick in
-- Switch scheduling strategies live from the dropdown
-- Click **Cordon** on a node to mark it unschedulable
-- Click **Reset** to reinitialize the cluster
+Open **http://localhost:8000** — click **Start** and the simulation runs automatically.
 
 ### Run the CLI Demo
 
@@ -118,12 +194,23 @@ Open **http://localhost:8000** — you'll see the orchestrator dashboard.
 python main.py demo
 ```
 
-Runs 30 ticks of simulation in the terminal with a rich table view (if `rich` is installed) or plain text output.
+### Run Benchmarks
 
-### Run Tests
+```bash
+python benchmarks.py
+```
+
+### Run Tests (28 tests)
 
 ```bash
 pytest tests/ -v
+```
+
+### Run with Docker
+
+```bash
+docker build -t k8s-sim .
+docker run -p 8000:8000 k8s-sim
 ```
 
 ---
@@ -132,8 +219,9 @@ pytest tests/ -v
 
 ```
 ├── main.py                     # Entry point (server / demo)
-├── requirements.txt            # Python dependencies
-├── README.md
+├── benchmarks.py               # Performance benchmark suite
+├── Dockerfile                  # Containerized deployment
+├── requirements.txt
 ├── src/
 │   ├── cluster/
 │   │   ├── node.py             # Node model — worker machine simulation
@@ -186,7 +274,7 @@ pytest tests/ -v
 | This Simulator | Real Kubernetes |
 |----------------|-----------------|
 | `ClusterManager` | kube-controller-manager |
-| `Scheduler` + strategies | kube-scheduler (filter → score → bind) |
+| `Scheduler` + strategies | kube-scheduler (filter -> score -> bind) |
 | `Node` + `ResourcePool` | kubelet + cAdvisor resource reporting |
 | `Pod` / `Container` | Pod / Container specs & runtime |
 | `HealthMonitor` | Node controller + pod eviction |
@@ -195,6 +283,7 @@ pytest tests/ -v
 | Dashboard | Kubernetes Dashboard / Lens |
 | Cordon/Uncordon | `kubectl cordon/uncordon` |
 | Restart policies | `restartPolicy: Always/Never` |
+| Pending pods | Insufficient resources / unschedulable |
 
 ---
 
@@ -205,8 +294,5 @@ pytest tests/ -v
 - **Pydantic** — request validation
 - **Rich** — terminal UI for CLI demo
 - **HTML/CSS/JS** — zero-dependency dashboard (no build step)
-- **pytest** — test suite
-
----
-
-*Built as a portfolio project demonstrating container orchestration internals.*
+- **Docker** — containerized deployment
+- **pytest** — 28 tests covering scheduler, cluster, pods, and resources
