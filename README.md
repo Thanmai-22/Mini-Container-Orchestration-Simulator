@@ -4,6 +4,10 @@ Designed and implemented a Kubernetes-inspired container orchestration engine to
 
 Simulates the core control plane of a container orchestrator — scheduling pods across a cluster of nodes with finite CPU/memory, handling node crashes with automatic eviction and rescheduling, and surfacing everything through a real-time dashboard.
 
+> **This project simulates real-world challenges faced in large-scale container platforms such as Kubernetes, including scheduling latency, resource fragmentation, noisy neighbor effects, and failure recovery — with measurable performance benchmarks.**
+
+Inspired by real-world container runtime behavior and Linux resource constraints (CPU/memory scheduling and isolation).
+
 ---
 
 ## Dashboard
@@ -38,7 +42,7 @@ First Fit is ~40% faster than Least Loaded on average, but Least Loaded produces
 | Best Fit | 101,893 | 50,946 |
 | Least Loaded | 89,632 | 43,746 |
 
-First Fit achieves ~29% higher throughput than Least Loaded due to its O(n) scan vs O(n log n) comparison.
+First Fit achieves ~29% higher throughput than Least Loaded due to its O(n) scan vs O(n log n) comparison. Tested with up to **100K+ pod scheduling operations** in burst scenarios to evaluate system behavior under high-load conditions.
 
 ### Resource Utilization Efficiency (varied pod sizes, 4 nodes)
 
