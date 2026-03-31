@@ -2,7 +2,6 @@
 
 Designed and implemented a Kubernetes-inspired container orchestration engine to explore **scheduling efficiency**, **resource contention**, and **failure recovery** in distributed systems.
 
-This project simulates real-world challenges faced in large-scale container platforms such as Kubernetes, including scheduling latency, resource fragmentation, noisy neighbor effects, and failure recovery with measurable performance benchmarks.
 
 > **This project simulates real-world challenges faced in large-scale container platforms such as Kubernetes, including scheduling latency, resource fragmentation, noisy neighbor effects, and failure recovery — with measurable performance benchmarks.**
 
