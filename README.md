@@ -2,7 +2,7 @@
 
 Designed and implemented a Kubernetes-inspired container orchestration engine to explore **scheduling efficiency**, **resource contention**, and **failure recovery** in distributed systems.
 
-This project simulates real-world challenges faced in large-scale container platforms such as Kubernetes, including scheduling latency, resource fragmentation, noisy neighbor effects, and failure recovery with measurable performance benchmarks.
+Simulates the core control plane of a container orchestrator — scheduling pods across a cluster of nodes with finite CPU/memory, handling node crashes with automatic eviction and rescheduling, and surfacing everything through a real-time dashboard.
 
 > **This project simulates real-world challenges faced in large-scale container platforms such as Kubernetes, including scheduling latency, resource fragmentation, noisy neighbor effects, and failure recovery — with measurable performance benchmarks.**
 
@@ -111,38 +111,9 @@ When cluster capacity is exhausted, new pods remain in `Pending` state — visib
 
 ## Architecture
 
-```
-+-----------------------------------------------------------------+
-|                      API Server (FastAPI)                        |
-|             REST endpoints + WebSocket real-time                 |
-+-----------------------------------------------------------------+
-|                                                                  |
-|  +--------------+   +--------------+   +--------------------+   |
-|  |   Scheduler  |   |   Cluster    |   |   Health Monitor   |   |
-|  |              |   |   Manager    |   |                    |   |
-|  | - First Fit  |   |              |   | - Failure detect   |   |
-|  | - Best Fit   |<->| - Node mgmt  |<->| - Auto-eviction   |   |
-|  | - Round Robin|   | - Pod CRUD   |   | - Auto-recovery    |   |
-|  | - Least Load |   | - Tick engine|   | - Re-scheduling    |   |
-|  +--------------+   +--------------+   +--------------------+   |
-|          |                |                     |               |
-|  +-------v-----------------v---------------------v-----------+  |
-|  |                    Core Models                            |  |
-|  |  Node (CPU/MEM pool)  <->  Pod (container group)         |  |
-|  |  ResourcePool         <->  Container (lifecycle)         |  |
-|  +-----------------------------------------------------------+  |
-|          |                                                      |
-|  +-------v---------------------------------------------------+  |
-|  |              Monitoring & Observability                    |  |
-|  |  EventLogger (structured events)                          |  |
-|  |  MetricsCollector (CPU/MEM utilization history)           |  |
-|  +-----------------------------------------------------------+  |
-|                                                                  |
-+-----------------------------------------------------------------+
-|                  Web Dashboard (single-page)                     |
-|        Real-time via WebSocket - Nodes - Pods - Metrics          |
-+-----------------------------------------------------------------+
-```
+![Mini Container Orchestration Simulator — architecture diagram](container_orchestrator_architecture.svg)
+
+*High-level view of the API layer, scheduler, cluster manager, health monitoring, core models, observability, and web dashboard.*
 
 ## Key Features
 
@@ -225,6 +196,7 @@ docker run -p 8000:8000 k8s-sim
 ├── main.py                     # Entry point (server / demo)
 ├── benchmarks.py               # Performance benchmark suite
 ├── Dockerfile                  # Containerized deployment
+├── container_orchestrator_architecture.svg  # Architecture diagram (README)
 ├── requirements.txt
 ├── src/
 │   ├── cluster/
