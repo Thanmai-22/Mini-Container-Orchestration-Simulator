@@ -2,9 +2,9 @@
 
 Designed and implemented a Kubernetes-inspired container orchestration engine to explore **scheduling efficiency**, **resource contention**, and **failure recovery** in distributed systems.
 
-Simulates the core control plane of a container orchestrator � scheduling pods across a cluster of nodes with finite CPU/memory, handling node crashes with automatic eviction and rescheduling, and surfacing everything through a real-time dashboard.
+Simulates the core control plane of a container orchestrator  -  scheduling pods across a cluster of nodes with finite CPU/memory, handling node crashes with automatic eviction and rescheduling, and surfacing everything through a real-time dashboard.
 
-> **This project simulates real-world challenges faced in large-scale container platforms such as Kubernetes, including scheduling latency, resource fragmentation, noisy neighbor effects, and failure recovery — with measurable performance benchmarks.**
+> **This project simulates real-world challenges faced in large-scale container platforms such as Kubernetes, including scheduling latency, resource fragmentation, noisy neighbor effects, and failure recovery  -  with measurable performance benchmarks.**
 
 Inspired by real-world container runtime behavior and Linux resource constraints (CPU/memory scheduling and isolation).
 
@@ -14,13 +14,13 @@ Inspired by real-world container runtime behavior and Linux resource constraints
 
 ![Dashboard Screenshot](screenshots/dashboard.png)
 
-*Real-time dashboard showing 3 cluster nodes, 11 running pods with Best Fit scheduling, CPU/memory utilization bars, container restart tracking, and a live event log — all updating via WebSocket.*
+*Real-time dashboard showing 3 cluster nodes, 11 running pods with Best Fit scheduling, CPU/memory utilization bars, container restart tracking, and a live event log  -  all updating via WebSocket.*
 
 ---
 
 ## Performance & Benchmarks
 
-All numbers are from real benchmarks (`python benchmarks.py`) — not estimates.
+All numbers are from real benchmarks (`python benchmarks.py`)  -  not estimates.
 
 ### Scheduling Latency (200 pods, 5 nodes)
 
@@ -53,7 +53,7 @@ First Fit achieves ~29% higher throughput than Least Loaded due to its O(n) scan
 | Least Loaded | 40 | 98.0% | 17.8% | **0.069** |
 | Round Robin | 32 | 96.9% | 34.7% | 0.098 |
 
-Best Fit places **25% more pods** than First Fit by packing bins more efficiently. Least Loaded has the lowest load imbalance (SD 0.069) — it keeps nodes evenly utilized.
+Best Fit places **25% more pods** than First Fit by packing bins more efficiently. Least Loaded has the lowest load imbalance (SD 0.069)  -  it keeps nodes evenly utilized.
 
 ### Failure Recovery
 
@@ -73,7 +73,7 @@ When a node fails, all its pods are evicted and rescheduled to surviving nodes w
 | Best Fit | **61.7%** |
 | Round Robin | 68.6% |
 
-Best Fit reduces fragmentation by ~10% compared to Round Robin — it packs workloads tightly, leaving fewer unusable resource gaps across nodes.
+Best Fit reduces fragmentation by ~10% compared to Round Robin  -  it packs workloads tightly, leaving fewer unusable resource gaps across nodes.
 
 ---
 
@@ -82,7 +82,7 @@ Best Fit reduces fragmentation by ~10% compared to Round Robin — it packs work
 | Strategy | Strength | Weakness | When to use |
 |---|---|---|---|
 | **First Fit** | Fastest scheduling (6.4us avg, 56K pods/sec) | Causes resource fragmentation; pods pile onto the first node | Latency-critical control planes where scheduling speed matters more than packing |
-| **Best Fit** | Best bin-packing — 25% more pods per cluster | Slower scheduling; can create hotspots on nearly-full nodes | Maximizing cluster density to reduce infrastructure cost |
+| **Best Fit** | Best bin-packing  -  25% more pods per cluster | Slower scheduling; can create hotspots on nearly-full nodes | Maximizing cluster density to reduce infrastructure cost |
 | **Round Robin** | Simple, predictable distribution | Ignores resource constraints; high fragmentation (68.6%) | Homogeneous workloads where all pods are the same size |
 | **Least Loaded** | Most balanced utilization (SD 0.069) | Slowest throughput (43K pods/sec); may scatter related pods | Production clusters where even utilization prevents tail latency spikes |
 
@@ -93,25 +93,25 @@ Best Fit reduces fragmentation by ~10% compared to Round Robin — it packs work
 ## Real-World Problems Simulated
 
 ### Resource Contention & Fragmentation
-Pods have varied CPU/memory requests (100-400m CPU, 128-512MB RAM). As nodes fill unevenly, small resource gaps appear that can't fit new pods — even though aggregate cluster capacity exists. Best Fit reduces this by 10% vs Round Robin.
+Pods have varied CPU/memory requests (100-400m CPU, 128-512MB RAM). As nodes fill unevenly, small resource gaps appear that can't fit new pods  -  even though aggregate cluster capacity exists. Best Fit reduces this by 10% vs Round Robin.
 
 ### Noisy Neighbor Effect
 High-CPU pods scheduled onto the same node compete for resources. The dashboard shows per-node CPU bars turning yellow (>65%) and red (>85%), making contention visible in real time.
 
 ### Node Failure & Cascading Recovery
-When a node crashes, all its pods are evicted simultaneously. The health monitor detects the failure, releases resources, re-queues pods, and the scheduler places them on surviving nodes — all within one tick. This mirrors how the Kubernetes node controller handles `NotReady` nodes.
+When a node crashes, all its pods are evicted simultaneously. The health monitor detects the failure, releases resources, re-queues pods, and the scheduler places them on surviving nodes  -  all within one tick. This mirrors how the Kubernetes node controller handles `NotReady` nodes.
 
 ### Scheduling Fairness vs Efficiency
 Least Loaded spreads pods evenly (good for tail latency) but can't pack as tightly as Best Fit (which maximizes density). This is the same tension between **spread** and **bin-packing** that production schedulers face.
 
 ### Pod Starvation
-When cluster capacity is exhausted, new pods remain in `Pending` state — visible in the dashboard as yellow badges. Adding a node or deleting pods frees capacity and triggers rescheduling, mirroring `kubectl get pods` showing `Pending` in real clusters.
+When cluster capacity is exhausted, new pods remain in `Pending` state  -  visible in the dashboard as yellow badges. Adding a node or deleting pods frees capacity and triggers rescheduling, mirroring `kubectl get pods` showing `Pending` in real clusters.
 
 ---
 
 ## Architecture
 
-![Mini Container Orchestration Simulator — architecture diagram](container_orchestrator_architecture.svg)
+![Mini Container Orchestration Simulator  -  architecture diagram](container_orchestrator_architecture.svg)
 
 *High-level view of the API layer, scheduler, cluster manager, health monitoring, core models, observability, and web dashboard.*
 
@@ -130,17 +130,17 @@ When cluster capacity is exhausted, new pods remain in `Pending` state — visib
 - Fragmentation analysis across strategies
 
 ### Failure Handling
-- **Node failures** — random crash simulation with configurable failure rates
-- **Container failures** — individual containers crash independently
-- **Auto-eviction** — pods on failed nodes are evicted and re-queued
-- **Auto-recovery** — nodes heal after a cooldown, enabling rescheduling
-- **Restart policies** — `Always` (auto-restart containers) and `Never` (fail permanently)
-- **100% recovery rate** — all evicted pods rescheduled within 1 tick
+- **Node failures**  -  random crash simulation with configurable failure rates
+- **Container failures**  -  individual containers crash independently
+- **Auto-eviction**  -  pods on failed nodes are evicted and re-queued
+- **Auto-recovery**  -  nodes heal after a cooldown, enabling rescheduling
+- **Restart policies**  -  `Always` (auto-restart containers) and `Never` (fail permanently)
+- **100% recovery rate**  -  all evicted pods rescheduled within 1 tick
 
 ### Monitoring & Observability
-- **Structured event log** — every scheduling decision, failure, and recovery is recorded with severity levels
-- **Metrics history** — CPU/memory utilization tracked over time with time-series snapshots
-- **Real-time dashboard** — WebSocket-powered live updates at 1Hz
+- **Structured event log**  -  every scheduling decision, failure, and recovery is recorded with severity levels
+- **Metrics history**  -  CPU/memory utilization tracked over time with time-series snapshots
+- **Real-time dashboard**  -  WebSocket-powered live updates at 1Hz
 
 ---
 
@@ -161,7 +161,7 @@ pip install -r requirements.txt
 python main.py server
 ```
 
-Open **http://localhost:8000** — click **Start** and the simulation runs automatically.
+Open **http://localhost:8000**  -  click **Start** and the simulation runs automatically.
 
 ### Run the CLI Demo
 
@@ -200,19 +200,19 @@ docker run -p 8000:8000 k8s-sim
 ├── requirements.txt
 ├── src/
 │   ├── cluster/
-│   │   ├── node.py             # Node model — worker machine simulation
-│   │   ├── cluster.py          # ClusterManager — central orchestration engine
-│   │   └── resources.py        # ResourcePool — CPU/memory allocation tracking
+│   │   ├── node.py             # Node model  -  worker machine simulation
+│   │   ├── cluster.py          # ClusterManager  -  central orchestration engine
+│   │   └── resources.py        # ResourcePool  -  CPU/memory allocation tracking
 │   ├── scheduler/
-│   │   ├── scheduler.py        # Scheduler — pending queue + bind workflow
+│   │   ├── scheduler.py        # Scheduler  -  pending queue + bind workflow
 │   │   └── strategies.py       # Pluggable strategies (4 algorithms)
 │   ├── pods/
-│   │   ├── pod.py              # Pod model — container group with lifecycle
-│   │   └── container.py        # Container model — individual process sim
+│   │   ├── pod.py              # Pod model  -  container group with lifecycle
+│   │   └── container.py        # Container model  -  individual process sim
 │   ├── monitoring/
-│   │   ├── health.py           # HealthMonitor — failure detection + recovery
-│   │   ├── metrics.py          # MetricsCollector — utilization snapshots
-│   │   └── logger.py           # EventLogger — structured cluster events
+│   │   ├── health.py           # HealthMonitor  -  failure detection + recovery
+│   │   ├── metrics.py          # MetricsCollector  -  utilization snapshots
+│   │   └── logger.py           # EventLogger  -  structured cluster events
 │   ├── api/
 │   │   └── server.py           # FastAPI REST + WebSocket server
 │   └── dashboard/
@@ -265,10 +265,10 @@ docker run -p 8000:8000 k8s-sim
 
 ## Technologies
 
-- **Python 3.10+** — core simulation engine
-- **FastAPI** — async REST API + WebSocket server
-- **Pydantic** — request validation
-- **Rich** — terminal UI for CLI demo
-- **HTML/CSS/JS** — zero-dependency dashboard (no build step)
-- **Docker** — containerized deployment
-- **pytest** — 28 tests covering scheduler, cluster, pods, and resources
+- **Python 3.10+**  -  core simulation engine
+- **FastAPI**  -  async REST API + WebSocket server
+- **Pydantic**  -  request validation
+- **Rich**  -  terminal UI for CLI demo
+- **HTML/CSS/JS**  -  zero-dependency dashboard (no build step)
+- **Docker**  -  containerized deployment
+- **pytest**  -  28 tests covering scheduler, cluster, pods, and resources
